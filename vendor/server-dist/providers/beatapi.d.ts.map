@@ -1,0 +1,1 @@
+{"version":3,"file":"beatapi.d.ts","sourceRoot":"","sources":["../../src/providers/beatapi.ts"],"names":[],"mappings":"AAAA,OAAO,EAAqB,KAAK,mBAAmB,EAAE,MAAM,WAAW,CAAC;AACxE,OAAO,EAAE,oBAAoB,EAAE,MAAM,oBAAoB,CAAC;AAE1D,eAAO,MAAM,gBAAgB,8BAA8B,CAAC;AAE5D,qBAAa,eAAgB,SAAQ,oBAAoB;;IAKxC,WAAW,CAAC,MAAM,EAAE,MAAM,GAAG,OAAO,CAAC,mBAAmB,CAAC;CAYzE"}

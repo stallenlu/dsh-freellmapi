@@ -1,0 +1,4 @@
+- insert:
+    - id: freellmapi
+      name: 'dsh-freellmapi'
+      config: {}

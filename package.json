@@ -1,0 +1,58 @@
+{
+  "name": "dsh-freellmapi",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "FreeLLMAPI for DSH: the local free-model router ships inside the plugin, so one install gives you a first-class model provider route plus start/stop control — no separate checkout, no Docker.",
+  "keywords": [
+    "dsh-plugin",
+    "deepseek-harness",
+    "freellmapi",
+    "llm-adapter",
+    "free-models"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/stallenlu/dsh-freellmapi.git"
+  },
+  "homepage": "https://github.com/stallenlu/dsh-freellmapi#readme",
+  "bugs": {
+    "url": "https://github.com/stallenlu/dsh-freellmapi/issues"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/adapter.js",
+    "lib/chat.js",
+    "lib/stream.js",
+    "lib/supervisor.js",
+    "lib/runtime.js",
+    "lib/store.js",
+    "lib/kernel.js",
+    "cordis.patch.yml",
+    "README.md",
+    "smoke.mjs",
+    "vendor/"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ]
+    }
+  },
+  "license": "MIT"
+}

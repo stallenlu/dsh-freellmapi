@@ -1,0 +1,1 @@
+{"version":3,"file":"min-context-window.d.ts","sourceRoot":"","sources":["../../src/lib/min-context-window.ts"],"names":[],"mappings":"AAcA,eAAO,MAAM,0BAA0B,uBAAuB,CAAC;AAK/D,eAAO,MAAM,0BAA0B,EAAE,MAAM,CAAC,MAAM,EAAE,MAAM,CAK7D,CAAC;AAEF;;;oEAGoE;AACpE,wBAAgB,qBAAqB,IAAI,MAAM,GAAG,IAAI,CAcrD;AAED;sEACsE;AACtE,wBAAgB,wBAAwB,CAAC,aAAa,EAAE,MAAM,GAAG,IAAI,GAAG,SAAS,GAAG,OAAO,CAK1F"}

@@ -1,0 +1,1 @@
+{"version":3,"file":"20261017_000002_remove_github_provider.d.ts","sourceRoot":"","sources":["../../../src/db/migrations/20261017_000002_remove_github_provider.ts"],"names":[],"mappings":"AAaA,OAAO,KAAK,EAAE,EAAE,EAAE,MAAM,aAAa,CAAC;AA4CtC,wBAAgB,EAAE,CAAC,EAAE,EAAE,EAAE,GAAG,IAAI,CAoB/B;AAED,wBAAgB,IAAI,CAAC,EAAE,EAAE,EAAE,GAAG,IAAI,CAYjC"}

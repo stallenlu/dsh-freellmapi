@@ -1,0 +1,1 @@
+{"version":3,"file":"stream-keepalive.d.ts","sourceRoot":"","sources":["../../src/lib/stream-keepalive.ts"],"names":[],"mappings":"AA4BA;;;;;GAKG;AACH,wBAAgB,iBAAiB,CAAC,GAAG,GAAE,MAAM,CAAC,UAAwB,GAAG,MAAM,CAM9E;AAED;;;;;;;;;;;;;GAaG;AACH,wBAAgB,oBAAoB,CAClC,UAAU,EAAE,MAAM,EAClB,MAAM,EAAE,MAAM,OAAO,EACrB,SAAS,EAAE,MAAM,IAAI,GACpB,MAAM,IAAI,CAgBZ"}

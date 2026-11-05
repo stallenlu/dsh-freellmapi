@@ -1,0 +1,100 @@
+# dsh-freellmapi
+
+FreeLLMAPI as a first-class model provider in DeepSeek Harness — and the router
+itself ships inside the plugin, so there is nothing else to install, clone, or
+build.
+
+## What it does
+
+- **Bundles the router.** `vendor/` carries the FreeLLMAPI server (compiled
+  `server-dist`, the dashboard SPA in `client-dist`, and the 95-package runtime
+  closure). The plugin launches it with the host's own binary — no system Node,
+  no Docker, no `E:\...` checkout.
+- Registers the provider route `freellmapi` and advertises the router's live
+  catalogue, so the model picker lists every id the router knows.
+- **Mints and reuses its own key.** On first boot the router generates a unified
+  API key; the plugin reads it straight out of the router's SQLite database, so
+  a fresh install works with zero setup. Setting `FREELLMAPI_API_KEY` overrides
+  it — that is the only handle you get for rotating it deliberately.
+- Starts, stops, and health-checks the router from the panel or from the
+  `freellmapi` tool.
+- Keeps its state under `$DSH_HOME/dsh-freellmapi/runtime/`: the SQLite database
+  and the `ENCRYPTION_KEY` that decrypts the stored provider keys live together,
+  so a restart never loses them.
+
+## Setup
+
+1. Enable the plugin (it is a bundle: one line in the profile's `package.json`
+   and one patch entry, both already written by `cordis.patch.yml`).
+2. Open the **FreeLLMAPI** panel in the sidebar, press **Start**. First boot
+   takes a few seconds and prints `Seeded 25 models and fallback config`.
+3. Pick `freellmapi` as the provider and `auto` (or any catalogue id) as the
+   model.
+4. To actually get answers, add at least one provider key at
+   <http://127.0.0.1:3001> — seven providers (aihorde, aisense, halx, keenable,
+   kilo, ovh, parallel) are keyless and work immediately; the rest need your own
+   signup.
+
+## Settings
+
+Stored in `$DSH_HOME/dsh-freellmapi/settings.json`:
+
+| key | default | meaning |
+| --- | --- | --- |
+| `baseURL` | `http://127.0.0.1:3001/v1` | OpenAI-compatible base of the router; its port is what the plugin launches on |
+| `requestTimeoutMs` | `300000` | per-attempt timeout; the harness maps it to `TIMEOUT` |
+| `defaultMaxTokens` | `8192` | cap applied when a call sends no `max_tokens` |
+| `autoStart` | `true` | start the router when the host boots |
+| `proxy` | `inherit` | `inherit` follows the system proxy; `direct` sets `NO_PROXY=*` for the router |
+
+`proxy` exists because the router inherits the OS proxy setting, and a proxy
+whose HTTPS `CONNECT` is broken turns every upstream call into `ECONNRESET`
+while the dashboard and `/v1/models` keep answering — which looks like the
+router is broken. Switching to `direct` is the one-line diagnosis.
+
+`autoStart` defaults to on because the router is part of the plugin: with it off,
+the provider route is registered but answers nothing until you press Start.
+
+A corrupt settings file fails loudly instead of silently resetting — losing a
+key path quietly is worse than a visible error.
+
+## Layout
+
+```
+lib/index.js       host half: adapter registration, tool, HTTP API, lifecycle
+lib/runtime.js     bundled-router paths, ENCRYPTION_KEY bootstrap, child env
+lib/adapter.js     provider adapter: catalogue, metadata, one HTTP attempt
+lib/chat.js        harness message blocks -> OpenAI chat wire projection
+lib/stream.js      SSE -> harness stream vocabulary, one attempt
+lib/supervisor.js  router process: reachability, start, stop, key handoff
+lib/store.js       settings file + credential resolution
+lib/kernel.js      the only @deepseek-ai/* seam (attribution user agent)
+lib/client.js      browser half: sidebar panel, model list, settings, config page
+vendor/            the bundled router: server-dist, client-dist, node_modules
+smoke.mjs          offline checks; add --live to hit a running router
+```
+
+## Why the router is vendored
+
+Upstream ships the server as an unpublished private workspace package, its
+installer requires Docker, and the desktop build is an Electron app that cannot
+run headless here. Vendoring the compiled output plus its runtime closure is the
+only shape that satisfies "a DSH plugin you install and use", and it keeps the
+plugin honest: the adapter talks HTTP to a process it owns.
+
+`vendor/server-dist/db/index.js` carries one local patch: `defaultDbFactory`
+falls back to `node:sqlite` when `better-sqlite3` cannot be loaded, because the
+host runs Node 24 (ABI 149) while the shipped native addon targets ABI 127.
+
+## Tests
+
+```
+node smoke.mjs           # offline: shaping, usage, finish reasons, pairing, runtime
+node smoke.mjs --live    # also: real catalogue + one real completion
+```
+
+The live check needs a router on `baseURL` with a usable provider key; it skips
+with a reason when either is missing.
+
+MIT — the bundled router is MIT, Copyright (c) 2026 Tashfeen Ahmed; see
+`vendor/LICENSE`.

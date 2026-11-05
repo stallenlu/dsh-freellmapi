@@ -1,0 +1,1 @@
+{"version":3,"file":"plugsky.d.ts","sourceRoot":"","sources":["../../src/providers/plugsky.ts"],"names":[],"mappings":"AAAA,OAAO,EAAqB,KAAK,mBAAmB,EAAE,MAAM,WAAW,CAAC;AACxE,OAAO,EAAE,oBAAoB,EAAE,MAAM,oBAAoB,CAAC;AAE1D,eAAO,MAAM,gBAAgB,2BAA2B,CAAC;AAEzD;sEACsE;AACtE,qBAAa,eAAgB,SAAQ,oBAAoB;;cAS9B,gBAAgB,CAAC,QAAQ,EAAE,QAAQ,GAAG,OAAO,CAAC,mBAAmB,CAAC;CAW5F"}
