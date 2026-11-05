@@ -248,6 +248,18 @@ check('a settings file starts the bundled router by default', async () => {
   assert.equal('startCommand' in DEFAULTS, false, 'a self-contained install needs no external command')
 })
 
+check('a port conflict is reported as one, not as a bare exit code', async () => {
+  const { describeExit } = await import('./lib/supervisor.js')
+  const says = describeExit('the bundled server exited with code 1', [
+    '[server] Failed to start:',
+    '  listen EADDRINUSE: address already in use 127.0.0.1:3001',
+  ])
+  assert.match(says, /already taken/, 'the user must be told the port is occupied')
+  assert.doesNotMatch(says, /EADDRINUSE/, 'the raw Node error is noise to a panel reader')
+  // Any other reason keeps the child's own words, since we cannot name it for them.
+  assert.match(describeExit('the bundled server exited with code 1', ['Error: boom']), /boom/)
+})
+
 // --- live router (opt-in) ---------------------------------------------------
 
 if (process.argv.includes('--live')) {
