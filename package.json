@@ -1,6 +1,6 @@
 {
   "name": "dsh-freellmapi",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "type": "module",
   "description": "FreeLLMAPI for DSH: the local free-model router ships inside the plugin, so one install gives you a first-class model provider route plus start/stop control — no separate checkout, no Docker.",
   "keywords": [
