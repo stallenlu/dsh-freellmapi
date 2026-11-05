@@ -370,6 +370,19 @@ check('the enabled list survives a save round trip', async () => {
   assert.equal(normalize({ probeModels: false }).probeModels, false)
 })
 
+check('panel cards are mounted as components, not called inline', () => {
+  // React hooks are per-component: calling StatusCard({...}) inline appends
+  // its hooks to the CALLER's list, so a tab switch changes the hook count and
+  // React throws — the whole panel renders blank. Every `X({ t, state, load })`
+  // in client.js must therefore be a `function X` declaration, never a call.
+  const src = readFileSync('./lib/client.js', 'utf8')
+  const re = /(\S+ )?(\b(?:StatusCard|SettingsCard|ModelList)\(\{ t, state, load \}\))/g
+  let m
+  while ((m = re.exec(src)) !== null) {
+    assert.equal(m[1], 'function ', `inline component call at offset ${m.index} — wrap it in h()`)
+  }
+})
+
 await Promise.all(pending)
 
 // --- live router (opt-in) ---------------------------------------------------
