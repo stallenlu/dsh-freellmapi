@@ -275,19 +275,31 @@ if (process.argv.includes('--live')) {
       settings: () => ({ ...DEFAULTS, ...saved, baseURL, apiKey }),
       logger: { debug() {}, warn() {}, info() {} },
     })
-    const rows = await adapter.fetchCatalog(baseURL, apiKey)
-    console.log(`ok   live: router catalogue has ${rows.length} model(s), ${rows.filter((r) => r.available).length} available`)
-    const model = rows.find((row) => row.id === 'auto')
-    assert.ok(model, 'the router must always offer `auto`')
-    const prepared = await adapter.prepareCall(ROUTE, 'auto')
-    const chunks = []
-    for await (const chunk of prepared.stream({ messages: [{ role: 'user', content: [{ type: 'text', text: 'Say PONG and nothing else.' }] }], maxTokens: 256 })) {
-      chunks.push(chunk)
+    // A stopped router is a skip, not a failure: this layer proves the wire
+    // format, and it cannot do that against nothing listening.
+    let rows
+    try {
+      rows = await adapter.fetchCatalog(baseURL, apiKey)
+    } catch (error) {
+      if (error.code !== 'TRANSPORT') throw error
+      console.log(`skip live: ${error.message} — start the router first`)
     }
-    const text = chunks.filter((c) => c.type === 'text-delta').map((c) => c.text).join('').trim()
-    assert.ok(text.length > 0, 'the router answered with no text')
-    assert.equal(chunks.at(-1).type, 'finish')
-    console.log(`ok   live: auto answered ${JSON.stringify(text.slice(0, 40))} via ${prepared.model.id}`)
+    if (rows === undefined) {
+      // nothing to assert against; the offline layer already ran
+    } else {
+      console.log(`ok   live: router catalogue has ${rows.length} model(s), ${rows.filter((r) => r.available).length} available`)
+      const model = rows.find((row) => row.id === 'auto')
+      assert.ok(model, 'the router must always offer `auto`')
+      const prepared = await adapter.prepareCall(ROUTE, 'auto')
+      const chunks = []
+      for await (const chunk of prepared.stream({ messages: [{ role: 'user', content: [{ type: 'text', text: 'Say PONG and nothing else.' }] }], maxTokens: 256 })) {
+        chunks.push(chunk)
+      }
+      const text = chunks.filter((c) => c.type === 'text-delta').map((c) => c.text).join('').trim()
+      assert.ok(text.length > 0, 'the router answered with no text')
+      assert.equal(chunks.at(-1).type, 'finish')
+      console.log(`ok   live: auto answered ${JSON.stringify(text.slice(0, 40))} via ${prepared.model.id}`)
+    }
   }
 }
 
