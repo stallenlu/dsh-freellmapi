@@ -306,6 +306,39 @@ check('the picker shows the window a request will really get', async () => {
   assert.equal(rows[1].contextWindow, 131_072, 'a slot falls back to the safe default in both paths')
 })
 
+check('a claimed-available flag alone does not decide what the picker offers', async () => {
+  const { selectRows, PROBE_TTL_MS } = await import('./lib/probe.js')
+  const now = Date.now()
+  const rows = [
+    { id: 'live', available: true },
+    { id: 'gone', available: true },
+    { id: 'cooling', available: true },
+    { id: 'nokey', available: false },
+  ]
+  const probes = {
+    gone: { ok: false, status: 404, at: now - 60_000 },
+    cooling: { ok: false, status: 429, at: now - 60_000 },
+  }
+  const picked = selectRows(rows, { probes, now })
+  assert.deepEqual(picked.rows.map((r) => r.id), ['live', 'cooling'], 'a 404 is removed, a rate limit is not')
+  assert.equal(picked.dead, 1)
+  // An old verdict is a guess again: cooldowns and upstreams move.
+  const stale = selectRows(rows, { probes: { gone: { ok: false, status: 404, at: now - PROBE_TTL_MS - 1 } }, now })
+  assert.deepEqual(stale.rows.map((r) => r.id), ['live', 'gone', 'cooling'])
+  // The user's own list wins outright, dead or not.
+  const own = selectRows(rows, { enabledModels: ['nokey'], probes, now })
+  assert.deepEqual(own.rows.map((r) => r.id), ['nokey'], 'a checked model is offered even when both signals say no')
+})
+
+check('the enabled list survives a save round trip', async () => {
+  const { normalize, DEFAULTS } = await import('./lib/store.js')
+  assert.deepEqual(DEFAULTS.enabledModels, [], 'the default is "follow the probes", not a fixed list')
+  const saved = normalize({ enabledModels: ['b', 'a', 'b', ' c ', 42] })
+  assert.deepEqual(saved.enabledModels, ['a', 'b', 'c'], 'sorted and deduplicated so a re-save is not dirty')
+  assert.equal(normalize({}).probeModels, true)
+  assert.equal(normalize({ probeModels: false }).probeModels, false)
+})
+
 // --- live router (opt-in) ---------------------------------------------------
 
 if (process.argv.includes('--live')) {

@@ -11,7 +11,10 @@ build.
   closure). The plugin launches it with the host's own binary — no system Node,
   no Docker, no `E:\...` checkout.
 - Registers the provider route `freellmapi` and advertises the router's live
-  catalogue, so the model picker lists every id the router knows.
+  catalogue. The router's own `available` flag is a database bit, not an answer,
+  so the plugin probes the models it claims and drops the ones that return
+  "model not found"; the panel lists both numbers and lets you tick exactly
+  which ids the picker should offer.
 - **Mints and reuses its own key.** On first boot the router generates a unified
   API key; the plugin reads it straight out of the router's SQLite database, so
   a fresh install works with zero setup. Setting `FREELLMAPI_API_KEY` overrides
@@ -49,6 +52,12 @@ Stored in `$DSH_HOME/dsh-freellmapi/settings.json`:
 | `defaultMaxTokens` | `8192` | cap applied when a call sends no `max_tokens` |
 | `autoStart` | `true` | start the router when the host boots |
 | `proxy` | `inherit` | `inherit` follows the system proxy; `direct` sets `NO_PROXY=*` for the router |
+| `probeModels` | `true` | send each claimed-available model one real request and drop the ones that answer "model not found" |
+| `enabledModels` | `[]` | empty follows the probes; a non-empty list is yours — those ids and only those, dead or not |
+
+The probe cache is `probes.json` next to the settings file, valid for 3 hours. A
+429 or a timeout is a moment, not a fact, so it never removes a model — only a
+404/422 does. Probing costs one short completion per model at three at a time.
 
 `proxy` exists because the router inherits the OS proxy setting, and a proxy
 whose HTTPS `CONNECT` is broken turns every upstream call into `ECONNRESET`
@@ -71,6 +80,7 @@ lib/chat.js        harness message blocks -> OpenAI chat wire projection
 lib/stream.js      SSE -> harness stream vocabulary, one attempt
 lib/supervisor.js  router process: reachability, start, stop, key handoff
 lib/store.js       settings file + credential resolution
+lib/probe.js       real availability: one request per claimed model, cached verdicts
 lib/kernel.js      the only @deepseek-ai/* seam (attribution user agent)
 lib/client.js      browser half: sidebar panel, model list, settings, config page
 vendor/            the bundled router: server-dist, client-dist, node_modules
