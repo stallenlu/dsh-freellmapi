@@ -260,6 +260,52 @@ check('a port conflict is reported as one, not as a bare exit code', async () =>
   assert.match(describeExit('the bundled server exited with code 1', ['Error: boom']), /boom/)
 })
 
+check('a lane with no key asks the router to start instead of failing', async () => {
+  const { FreeLlmApiAdapter } = await import('./lib/adapter.js')
+  let started = 0
+  const adapter = new FreeLlmApiAdapter({
+    // The key only exists after the start, exactly like a first-ever boot.
+    settings: () => ({ baseURL: 'http://127.0.0.1:3001/v1', apiKey: started === 0 ? undefined : 'k', defaultMaxTokens: 8192 }),
+    logger: {},
+    ensureUp: async () => {
+      started += 1
+      return true
+    },
+  })
+  adapter.readCatalog = async () => [{ id: 'auto', name: 'auto', contextWindow: 128_000 }]
+  const rows = await adapter.listModels('freellmapi')
+  assert.equal(started, 1, 'the picker cannot start the router itself, so the adapter must')
+  assert.equal(rows.length, 1)
+})
+
+check('concurrent lanes share one start', async () => {
+  const { Supervisor } = await import('./lib/supervisor.js')
+  let spawns = 0
+  const supervisor = new Supervisor({ stateDir: 'unused', settings: () => ({}), logger: {} })
+  supervisor.reachable = async () => false
+  supervisor.startUnshared = async () => {
+    spawns += 1
+    await new Promise((r) => setTimeout(r, 20))
+    return { started: true }
+  }
+  await Promise.all([supervisor.start(), supervisor.start(), supervisor.start()])
+  assert.equal(spawns, 1, 'two lanes racing a cold router must not both spawn')
+})
+
+check('the picker shows the window a request will really get', async () => {
+  const { FreeLlmApiAdapter } = await import('./lib/adapter.js')
+  const adapter = new FreeLlmApiAdapter({ settings: () => ({ baseURL: 'http://x/v1', apiKey: 'k', defaultMaxTokens: 8192 }), logger: {} })
+  adapter.readCatalog = async () => [
+    { id: 'qwen3.8-27b', name: 'q', contextWindow: 262_000 },
+    // A slot's window belongs to the model behind it, so it must not be advertised.
+    { id: 'claude-sonnet-4-5', name: 'c', contextWindow: 128_000 },
+  ]
+  const rows = await adapter.listModels('freellmapi')
+  const real = await adapter.resolveModel('freellmapi', 'qwen3.8-27b')
+  assert.equal(rows[0].contextWindow, real.context.contextWindow)
+  assert.equal(rows[1].contextWindow, 131_072, 'a slot falls back to the safe default in both paths')
+})
+
 // --- live router (opt-in) ---------------------------------------------------
 
 if (process.argv.includes('--live')) {
@@ -279,13 +325,31 @@ if (process.argv.includes('--live')) {
   // A self-contained install has no reason to need an exported key: the bundled
   // router mints one on first boot, and that is the key the plugin uses.
   apiKey ??= await readUnifiedKey(runtimePaths(stateDir).dbPath)
+  // Same lane the picker uses: if the router is down, bring it up rather than
+  // declaring the check skipped. A first-ever boot also mints the key.
+  const { Supervisor } = await import('./lib/supervisor.js')
+  const saved = new SettingsFile(stateDir).get()
+  const supervisor = new Supervisor({
+    stateDir,
+    settings: () => ({ ...DEFAULTS, ...saved }),
+    logger: { debug() {}, warn() {}, info() {} },
+  })
+  const ensureUp = async () => {
+    await supervisor.start({
+      onKey: async (key) => {
+        apiKey ??= key
+      },
+    })
+    return true
+  }
+  await ensureUp().catch((error) => console.log(`skip live: ${error.message}`))
   if (apiKey === undefined) {
     console.log('skip live: the router has not minted a unified key yet (start it once)')
   } else {
-    const saved = new SettingsFile(stateDir).get()
     const adapter = new FreeLlmApiAdapter({
       settings: () => ({ ...DEFAULTS, ...saved, baseURL, apiKey }),
       logger: { debug() {}, warn() {}, info() {} },
+      ensureUp,
     })
     // A stopped router is a skip, not a failure: this layer proves the wire
     // format, and it cannot do that against nothing listening.
@@ -312,6 +376,13 @@ if (process.argv.includes('--live')) {
       assert.equal(chunks.at(-1).type, 'finish')
       console.log(`ok   live: auto answered ${JSON.stringify(text.slice(0, 40))} via ${prepared.model.id}`)
     }
+  }
+  // This script spawned the router, so it must not leave the process alive: a
+  // live check that never exits is indistinguishable from a hang. taskkill is
+  // asynchronous, so wait for the port to actually close before returning.
+  supervisor.stop()
+  for (let i = 0; i < 40 && (await supervisor.reachable(100)); i += 1) {
+    await new Promise((r) => setTimeout(r, 100))
   }
 }
 

@@ -27,7 +27,10 @@ build.
 1. Enable the plugin (it is a bundle: one line in the profile's `package.json`
    and one patch entry, both already written by `cordis.patch.yml`).
 2. Open the **FreeLLMAPI** panel in the sidebar, press **Start**. First boot
-   takes a few seconds and prints `Seeded 25 models and fallback config`.
+   takes a few seconds and prints `Seeded 25 models and fallback config`. With
+   `autoStart` on (the default) this also happens on its own — opening the model
+   list is enough, because discovery starts the router before it asks for the
+   catalogue.
 3. Pick `freellmapi` as the provider and `auto` (or any catalogue id) as the
    model.
 4. To actually get answers, add at least one provider key at
