@@ -383,6 +383,24 @@ check('panel cards are mounted as components, not called inline', () => {
   }
 })
 
+check('the panel offers an entry-visibility choice that gates the slots', () => {
+  // A slot cannot be registered conditionally, so the placement preference works
+  // by mounting and tearing the injection down. If someone folds the inject()
+  // calls back into bare ctx.slots.inject, the setting becomes a no-op that
+  // still saves — silently. Assert the wiring instead of trusting it.
+  const src = readFileSync('./lib/client.js', 'utf8')
+  assert.match(src, /makePref\('dflm\.placement'/, 'placement pref missing')
+  assert.match(src, /bindWhile\(\s*\(\) => placement\.get\(\) !== 'sidebar'/, 'plugin page entry not gated')
+  assert.match(src, /bindWhile\(\s*\(\) => placement\.get\(\) !== 'settings'/, 'sidebar entry not gated')
+  // The panel route is NOT gated: a view another part of the app can hold open
+  // must not disappear because its icon was hidden. Only the icon is. Injections
+  // inside a bindWhile array sit 16 spaces deep; a bare one sits 8.
+  const main = src.match(/^ {8}ctx\.slots\.inject\('main'/m)
+  assert.ok(main, 'the main panel injection must stay outside bindWhile')
+  // and every card still mounts through h(), for the reason above
+  assert.doesNotMatch(src, /[^n] (?:StatusCard|SettingsCard|ModelList)\(\{ t, state, load \}\)/, 'inline component call')
+})
+
 await Promise.all(pending)
 
 // --- live router (opt-in) ---------------------------------------------------

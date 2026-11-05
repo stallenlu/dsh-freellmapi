@@ -16,6 +16,10 @@ build.
   "model not found"; the panel lists both numbers and lets you tick exactly
   which ids the picker should offer. The panel is split into Status / Models /
   Settings tabs, and the same Settings form also shows on DSH's plugin page.
+- Lets you choose where it shows up. The Settings tab has an **Entry** picker —
+  both places, sidebar only, or plugin page only. Choosing "plugin page only"
+  hides the sidebar icon and embeds the model list on that page instead, so the
+  plugin is never left without a way in.
 - **Mints and reuses its own key.** On first boot the router generates a unified
   API key; the plugin reads it straight out of the router's SQLite database, so
   a fresh install works with zero setup. Setting `FREELLMAPI_API_KEY` overrides
