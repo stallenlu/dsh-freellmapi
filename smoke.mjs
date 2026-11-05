@@ -20,14 +20,23 @@ import { BlockWriter, CODE, classifyStatus, finishReason, mapUsage, readChatStre
 import { normalize } from './lib/store.js'
 
 const failures = []
+const pending = []
 function check(label, body) {
-  try {
-    body()
-    console.log(`ok   ${label}`)
-  } catch (error) {
+  const record = (error) => {
     failures.push(`${label}: ${error.message}`)
     console.log(`FAIL ${label}: ${error.message}`)
   }
+  let result
+  try {
+    result = body()
+  } catch (error) {
+    record(error)
+    return
+  }
+  // An async body used to print `ok` on its way out and throw afterwards, so a
+  // broken filter could pass this suite for a whole release. Await them all.
+  if (result instanceof Promise) pending.push(result.then(() => console.log(`ok   ${label}`), record))
+  else console.log(`ok   ${label}`)
 }
 
 function sse(payloads) {
@@ -330,6 +339,28 @@ check('a claimed-available flag alone does not decide what the picker offers', a
   assert.deepEqual(own.rows.map((r) => r.id), ['nokey'], 'a checked model is offered even when both signals say no')
 })
 
+check('the host path is the one that gets narrowed', async () => {
+  const { FreeLlmApiAdapter } = await import('./lib/adapter.js')
+  // `LlmService.listModels()` calls the registered ADAPTER, not the discovery
+  // callback, so filtering only in the callback changes nothing in the picker.
+  const adapter = new FreeLlmApiAdapter({
+    settings: () => ({ baseURL: 'http://x/v1', apiKey: 'k', defaultMaxTokens: 8192 }),
+    logger: {},
+    offer: (rows) => ({ rows: rows.filter((r) => r.id !== 'gone'), dead: 1, claimed: rows.length }),
+  })
+  adapter.readCatalog = async () => [
+    { id: 'live', name: 'l', contextWindow: 128_000, available: true },
+    { id: 'gone', name: 'g', contextWindow: 128_000, available: true },
+  ]
+  const offered = await adapter.listModels('freellmapi')
+  assert.deepEqual(offered.map((r) => r.id), ['live'], 'the picker only sees what offer() keeps')
+  const every = await adapter.allModels('freellmapi')
+  assert.deepEqual(every.map((r) => r.id), ['live', 'gone'], 'the panel still lists what was dropped, to re-enable it')
+  // A dropped id must stay usable when typed by hand — the router may know better.
+  const resolved = await adapter.resolveModel('freellmapi', 'gone')
+  assert.equal(resolved.id, 'gone')
+})
+
 check('the enabled list survives a save round trip', async () => {
   const { normalize, DEFAULTS } = await import('./lib/store.js')
   assert.deepEqual(DEFAULTS.enabledModels, [], 'the default is "follow the probes", not a fixed list')
@@ -338,6 +369,8 @@ check('the enabled list survives a save round trip', async () => {
   assert.equal(normalize({}).probeModels, true)
   assert.equal(normalize({ probeModels: false }).probeModels, false)
 })
+
+await Promise.all(pending)
 
 // --- live router (opt-in) ---------------------------------------------------
 

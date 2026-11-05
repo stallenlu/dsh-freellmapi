@@ -14,7 +14,8 @@ build.
   catalogue. The router's own `available` flag is a database bit, not an answer,
   so the plugin probes the models it claims and drops the ones that return
   "model not found"; the panel lists both numbers and lets you tick exactly
-  which ids the picker should offer.
+  which ids the picker should offer. The panel is split into Status / Models /
+  Settings tabs, and the same Settings form also shows on DSH's plugin page.
 - **Mints and reuses its own key.** On first boot the router generates a unified
   API key; the plugin reads it straight out of the router's SQLite database, so
   a fresh install works with zero setup. Setting `FREELLMAPI_API_KEY` overrides
