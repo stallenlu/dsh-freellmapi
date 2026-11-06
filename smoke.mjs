@@ -414,8 +414,54 @@ check('the list can be sorted and bulk-ticked without losing the filter scope', 
   }
   assert.match(src, /const selectShown = \(\) => setDraft\(\[\.\.\.new Set\(\[\.\.\.selected, \.\.\.shownIds\]\)\]\)/, 'select all must use the listed ids')
   assert.match(src, /setDraft\(selected\.filter\(\(id\) => !gone\.has\(id\)\)\)/, 'clear shown must only drop the listed ids')
+  // The bulk row leads with "tick usable", and usable means exactly what the
+  // 实测可用 tag says — a probe that answered. Including `offered` here made
+  // the button keep dead rows in your own list, which is what the user hit.
+  assert.match(src, /const usableIds = useMemo\(/, 'usable rows must be computed from the listed rows')
+  assert.match(src, /shown\.filter\(\(row\) => row\.probe && row\.probe\.probed === true && row\.probe\.ok === true\)/, 'usable means a probe answered, nothing else')
+  // It REPLACES the listed rows, not unions with them: pressing it after 全选
+  // must drop the dead ones, or the user has to clear first every time.
+  assert.match(src, /setDraft\(\[\.\.\.new Set\(\[\.\.\.selected\.filter\(\(id\) => !listed\.has\(id\)\), \.\.\.usableIds\]\)\]\)/, 'tick usable must replace the listed rows')
+  assert.ok(src.includes("t('selectUsable', { n: usableIds.length })"), 'the usable button must show how many it ticks')
   assert.match(src, /if \(probe\.transient !== true\) return 2/, 'status rank must not treat a 429 as dead')
   assert.doesNotMatch(src, /statusRank[\s\S]{0,240}row\.available/, 'status rank must ignore the router flag')
+  // Every sort mode leads with the rows the picker actually offers: a sort by
+  // name that buries the working models under 287 dead ones helps nobody.
+  for (const key of ['name', 'context', 'status']) {
+    assert.ok(
+      src.includes(`if (sortKey === '${key}') return [...list].sort((a, b) => Number(b.offered) - Number(a.offered) ||`),
+      `sort ${key} must put offered rows first`,
+    )
+  }
+  // appearance:none kills the native arrow, and the pill has no border, so the
+  // select rendered as plain text and the user reported the sort feature was
+  // missing. It has to draw its own affordance.
+  assert.match(src, /\.dflm-cfg-select \{[^}]*background-image: url\("data:image\/svg\+xml/, 'the select must draw a dropdown arrow')
+  assert.match(src, /\.dflm-cfg-select \{[^}]*padding: 0 28px 0 14px/, 'the arrow needs room that text cannot overlap')
+  // The control sits in the same row as .dflm-btn buttons; a different height
+  // or radius next to them reads as a misfit (user: 排序按钮的配置不协调).
+  assert.match(src, /\.dflm-cfg-select \{[^}]*height: 32px[^}]*border-radius: 16px/, 'the select must match the button geometry')
+})
+
+check('the package ships an icon DSH can actually render', () => {
+  // DSH reads a package-root `icon` (or the ./icon export), and `npm pack`
+  // silently drops anything not listed in `files` — v1.0.4 shipped a tarball
+  // whose index.js imported a module that was not in it. Check all three.
+  const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
+  assert.equal(pkg.icon, './icon.svg', 'package.json must declare the icon')
+  assert.equal(pkg.exports['./icon'], './icon.svg', 'the ./icon export must resolve')
+  assert.ok(pkg.files.includes('icon.svg'), 'npm pack would drop the icon')
+  const svg = readFileSync('./icon.svg', 'utf8')
+  assert.ok(svg.length <= 256 * 1024, 'DSH rejects icons over 256 KiB')
+  assert.match(svg, /^<svg[^>]*viewBox="0 0 24 24"/, 'the SVG needs its viewBox')
+  assert.match(svg, /stroke="currentColor"/, 'the icon must follow the theme')
+  assert.ok((svg.match(/<circle|<path/g) || []).length >= 6, 'the icon must have visible geometry')
+  // The sidebar draws its own copy; keeping the two in sync is a real regression
+  // risk, so assert the same motif and both currentColor + size passthrough.
+  const client = readFileSync('./lib/client.js', 'utf8')
+  assert.match(client, /function PanelIcon\(\{ size \}\)/, 'the sidebar icon must take the host size')
+  assert.match(client, /cx: 4\.6, cy: 12, r: 2\.1/, 'sidebar icon must use the router motif')
+  assert.match(client, /stroke: 'currentColor'/, 'sidebar icon must follow the theme')
 })
 
 await Promise.all(pending)
