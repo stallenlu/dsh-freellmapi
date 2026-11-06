@@ -20,6 +20,9 @@ build.
   both places, sidebar only, or plugin page only. Choosing "plugin page only"
   hides the sidebar icon and embeds the model list on that page instead, so the
   plugin is never left without a way in.
+- The model list sorts by name, context size, or measured availability, and
+  Select all / Clear shown act on the rows the search box left visible — so
+  "type qwen, select all" ticks the qwen family, not all 287.
 - **Mints and reuses its own key.** On first boot the router generates a unified
   API key; the plugin reads it straight out of the router's SQLite database, so
   a fresh install works with zero setup. Setting `FREELLMAPI_API_KEY` overrides

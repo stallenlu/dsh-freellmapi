@@ -401,6 +401,23 @@ check('the panel offers an entry-visibility choice that gates the slots', () => 
   assert.doesNotMatch(src, /[^n] (?:StatusCard|SettingsCard|ModelList)\(\{ t, state, load \}\)/, 'inline component call')
 })
 
+check('the list can be sorted and bulk-ticked without losing the filter scope', () => {
+  // 287 rows is too many to tick one by one, so the panel offers sort keys and
+  // select-all / clear-shown. Two things break silently here: the bulk buttons
+  // must act on the LISTED rows (that is what makes "search qwen, select all"
+  // work), and the status sort must rank on the probe verdict, not the router's
+  // own flag — the flag is the number this panel exists to question.
+  const src = readFileSync('./lib/client.js', 'utf8')
+  assert.match(src, /usePersistent\('dflm\.sort', 'default'\)/, 'sort choice not persisted')
+  for (const key of ['default', 'name', 'context', 'status']) {
+    assert.ok(src.includes(`h('option', { value: '${key}' }`), `sort option ${key} missing`)
+  }
+  assert.match(src, /const selectShown = \(\) => setDraft\(\[\.\.\.new Set\(\[\.\.\.selected, \.\.\.shownIds\]\)\]\)/, 'select all must use the listed ids')
+  assert.match(src, /setDraft\(selected\.filter\(\(id\) => !gone\.has\(id\)\)\)/, 'clear shown must only drop the listed ids')
+  assert.match(src, /if \(probe\.transient !== true\) return 2/, 'status rank must not treat a 429 as dead')
+  assert.doesNotMatch(src, /statusRank[\s\S]{0,240}row\.available/, 'status rank must ignore the router flag')
+})
+
 await Promise.all(pending)
 
 // --- live router (opt-in) ---------------------------------------------------
