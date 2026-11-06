@@ -22,7 +22,7 @@ build.
   plugin is never left without a way in.
 - The model list sorts by name, context size, or measured availability, and
   every mode keeps the rows the picker actually offers at the top. Bulk ticking
-  leads with "Tick usable" (offered or probe-answered), and all three buttons
+  leads with "Tick usable" (probe-answered only), and all three buttons
   act on the rows the search box left visible — so "type qwen, tick usable"
   selects the working qwen models, not all 287.
 - **Mints and reuses its own key.** On first boot the router generates a unified
