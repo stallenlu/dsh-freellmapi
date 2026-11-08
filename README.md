@@ -32,6 +32,11 @@ build.
   What the panel deliberately does not copy is the parts only the dashboard can
   own — provider keys, routing strategy, usage charts. Both the Ranking tab and
   the status card carry an **Open the full console** button for those.
+- **Wears the host's theme.** Every colour in the panel is a DSH theme token
+  (`--dsw-alias-*`), not a hard-coded hex, so it flips between light and dark
+  together with the rest of the app. The panel also measures its own resolved
+  background and sets `color-scheme` on its subtree — a native `<select>` popup
+  is drawn by the OS, and without that it opens white inside a dark app.
 - Lets you choose where it shows up. The Settings tab has an **Entry** picker —
   both places, sidebar only, or plugin page only. Choosing "plugin page only"
   hides the sidebar icon and embeds the model list on that page instead, so the
@@ -52,6 +57,10 @@ build.
   so a restart never loses them.
 
 ## Setup
+
+Install the tarball from the [releases page](https://github.com/stallenlu/dsh-freellmapi/releases)
+rather than the git tree: `vendor/node_modules` is the 95-package runtime closure,
+and only the packed tarball carries it.
 
 1. Enable the plugin (it is a bundle: one line in the profile's `package.json`
    and one patch entry, both already written by `cordis.patch.yml`).
@@ -111,6 +120,8 @@ lib/ranking.js     the dashboard's ranking table, read out of the router's datab
 lib/kernel.js      the only @deepseek-ai/* seam (attribution user agent)
 lib/client.js      browser half: sidebar panel, ranking, model list, settings
 vendor/            the bundled router: server-dist, client-dist, node_modules
+assets/            storefront tile and screenshots
+screenshots.json   storefront images, read by the dshmarket listing
 smoke.mjs          offline checks; add --live to hit a running router
 ```
 
