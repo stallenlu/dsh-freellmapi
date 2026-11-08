@@ -394,11 +394,13 @@ check('the panel offers an entry-visibility choice that gates the slots', () => 
   assert.match(src, /bindWhile\(\s*\(\) => placement\.get\(\) !== 'settings'/, 'sidebar entry not gated')
   // The panel route is NOT gated: a view another part of the app can hold open
   // must not disappear because its icon was hidden. Only the icon is. Injections
-  // inside a bindWhile array sit 16 spaces deep; a bare one sits 8.
-  const main = src.match(/^ {8}ctx\.slots\.inject\('main'/m)
+  // inside a bindWhile array sit at least 16 spaces deep; a bare one sits 8 —
+  // 10 now that the whole body lives inside the try/catch that keeps a broken
+  // panel from taking the web boot down with it.
+  const main = src.match(/^ {8,12}ctx\.slots\.inject\('main'/m)
   assert.ok(main, 'the main panel injection must stay outside bindWhile')
   // and every card still mounts through h(), for the reason above
-  assert.doesNotMatch(src, /[^n] (?:StatusCard|SettingsCard|ModelList)\(\{ t, state, load \}\)/, 'inline component call')
+  assert.doesNotMatch(src, /[^n] (?:StatusCard|SettingsCard|ModelList|Ranking)\(\{ t, state, load \}\)/, 'inline component call')
 })
 
 check('the list can be sorted and bulk-ticked without losing the filter scope', () => {
@@ -462,6 +464,103 @@ check('the package ships an icon DSH can actually render', () => {
   assert.match(client, /function PanelIcon\(\{ size \}\)/, 'the sidebar icon must take the host size')
   assert.match(client, /cx: 4\.6, cy: 12, r: 2\.1/, 'sidebar icon must use the router motif')
   assert.match(client, /stroke: 'currentColor'/, 'sidebar icon must follow the theme')
+})
+
+// --- ranking ----------------------------------------------------------------
+
+check('the ranking reads the router’s own scores, not a second opinion', async () => {
+  const { rankOf, consoleUrlOf, readRanking } = await import('./lib/ranking.js')
+  // The console link is derived from the API base; a wrong strip sends the
+  // button to a 404 in the browser.
+  assert.equal(consoleUrlOf('http://127.0.0.1:3001/v1'), 'http://127.0.0.1:3001')
+  assert.equal(consoleUrlOf('http://127.0.0.1:3001/v1/'), 'http://127.0.0.1:3001')
+  assert.equal(consoleUrlOf('http://127.0.0.1:3001'), 'http://127.0.0.1:3001')
+  assert.equal(consoleUrlOf(''), undefined)
+  // A missing database is a missing feature, not a crash: the panel has to keep
+  // listing models when the router has never been started.
+  const missing = await readRanking(path.join(os.tmpdir(), 'dsh-freellmapi-no-such-freeapi.db'))
+  assert.equal(missing, undefined)
+  assert.equal(rankOf(missing, 'auto'), undefined)
+  // The numbers must come from the vendored router. A hand-rolled join misses
+  // two thirds of the catalogue, because /v1/models is keyed by group slug, not
+  // by models.model_id — so assert the source of truth, not a copy of it.
+  const src = readFileSync('./lib/ranking.js', 'utf8')
+  assert.match(src, /services\/model-groups\.js/, 'canonical ids must come from the router')
+  assert.match(src, /getModelGroups\(\)/, 'canonical ids must come from the router')
+  assert.match(src, /services\/router\.js/, 'the score must be the dashboard’s own pass')
+  assert.match(src, /getRoutingScores\(\)/, 'the score must be the dashboard’s own pass')
+  // Read-only, and without the side effects a status poll must not have:
+  // connectDb on a real path sets WAL and runs icacls on the live database.
+  assert.match(src, /new DatabaseSync\(dbPath, \{ readOnly: true \}\)/, 'the database must be opened read-only')
+  assert.match(src, /connectDb\(':memory:'/, ':memory: is what skips WAL and the ACL rewrite')
+  // A thrown status call would blank the whole panel; the ranking is optional.
+  assert.match(src, /return undefined/, 'an unreadable database must degrade, not throw')
+})
+
+check('the panel exposes the ranking tab and a way to the full console', () => {
+  const src = readFileSync('./lib/client.js', 'utf8')
+  assert.match(src, /const TABS = \['status', 'ranking', 'models', 'settings'\]/, 'the ranking tab must be reachable')
+  assert.match(src, /tab === 'ranking' \? h\(Ranking, /, 'the ranking tab must mount its component')
+  // The panel is a viewer; provider keys and routing policy stay in the :3001
+  // dashboard, so the door has to exist in both the tab and the status card.
+  assert.match(src, /href: catalogue\.consoleUrl/, 'the status card must link to the console')
+  assert.match(src, /href: consoleUrl/, 'the ranking tab must link to the console')
+  assert.match(src, /target: '_blank'/, 'the console must open in a new tab')
+  assert.match(src, /rel: 'noreferrer noopener'/, 'the console link must not leak the opener')
+  // Three axes, three colours: a translated label must never pick the bar colour.
+  assert.match(src, /function RankAxis\(\{ kind, value, label \}\)/, 'the axis must take its colour from kind')
+  for (const kind of ['stability', 'speed', 'intelligence']) {
+    assert.ok(src.includes(`kind: '${kind}'`), `missing ${kind} axis`)
+  }
+  // An inline span accepts neither width nor height, so a fill drawn that way is
+  // invisible — the first version shipped exactly that bug. The fill must be a
+  // block-level box nested in a track that is a flex child.
+  assert.match(src, /\.dflm-axis-fill \{ display: block;/, 'the fill must be block-level or its width is ignored')
+  assert.match(src, /\.dflm-axis-track \{[^}]*flex: 1 1 auto;/, 'the track must grow inside the axis')
+})
+
+check('the ranking tab is usable, not just readable', () => {
+  const src = readFileSync('./lib/client.js', 'utf8')
+  // Every control the :3001 table has and this one can honestly support.
+  assert.match(src, /className: 'dflm-switch'/, 'each row needs its own enable switch')
+  assert.match(src, /'aria-pressed': picked\.has\(row\.id\)/, 'the switch must report its state')
+  assert.ok(src.includes('const RANK_SORTS'), 'the table must be sortable')
+  for (const key of ['rankAllOn', 'rankAllOff', 'rankShowing', 'rankModel']) {
+    assert.ok(src.includes(key + ':'), 'missing ' + key + ' label')
+  }
+  // Filters the ranking data can actually answer.
+  assert.match(src, /dflm\.rankVision/, 'vision filter')
+  assert.match(src, /dflm\.rankTools/, 'tools filter')
+  assert.match(src, /dflm\.rankCtx/, 'context-size filter')
+  // The row shows the display name, not the routing slug: the slug is what the
+  // API answers to, the name is what the dashboard shows.
+  assert.match(src, /row\.name \|\| row\.id/, 'rows must fall back to id only when unnamed')
+})
+
+check('native selects follow the panel theme, not the OS default', () => {
+  const src = readFileSync('./lib/client.js', 'utf8')
+  // A native <select> popup is drawn by the browser from `color-scheme`, and
+  // the host never sets it — so on a dark DSH the list opened white with a blue
+  // highlight. Setting it on the panel root is the only thing that reaches the
+  // popup; the option rule keeps the rows readable while it is open. Both are
+  // easy to lose in a restyle, and the loss is invisible in a screenshot of the
+  // closed control.
+  assert.match(
+    src,
+    /\.dflm select option \{ background-color: var\(--dsw-alias-bg-layer-2/,
+    'the open popup rows must use a theme surface',
+  )
+  assert.match(src, /function readScheme\(\)/, 'the panel must measure the active theme')
+  assert.match(src, /dsw-alias-bg-layer-1/, 'readScheme must sample a theme surface token')
+  assert.match(src, /function useColorScheme\(\)/, 'the scheme must be reactive')
+  assert.match(src, /MutationObserver/, 'a theme flip must re-measure, not wait for a reload')
+  assert.match(src, /colorScheme: scheme/, 'the measured scheme must reach the DOM')
+  // Both surfaces that host a select need it: the panel and the settings view.
+  assert.equal(
+    (src.match(/useColorScheme\(\)/g) || []).length >= 3,
+    true,
+    'Panel and BundleConfig must both apply the measured scheme',
+  )
 })
 
 await Promise.all(pending)

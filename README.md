@@ -14,15 +14,31 @@ build.
   catalogue. The router's own `available` flag is a database bit, not an answer,
   so the plugin probes the models it claims and drops the ones that return
   "model not found"; the panel lists both numbers and lets you tick exactly
-  which ids the picker should offer. The panel is split into Status / Models /
-  Settings tabs, and the same Settings form also shows on DSH's plugin page.
+  which ids the picker should offer. The panel is split into Status / Ranking /
+  Models / Settings tabs, and the same Settings form also shows on DSH's plugin
+  page.
+- **Shows the router's own ranking, natively.** The **Ranking** tab draws the
+  same table as the bundled dashboard's model page — one row per model with a
+  stability / speed / intelligence bar, the combined score to three decimals,
+  the serving platforms, rate limits and context window. It is sortable by any
+  of the three axes or the score, filterable by name, vision, tools and minimum
+  context window, and every row has its own enable switch plus the usual
+  "enable shown" / "disable shown" bulk actions before you apply.
+
+  The numbers are not a reimplementation: the tab opens the router's database
+  read-only and computes them with the router's own `getRoutingScores()` and
+  `getModelGroups()`, so the panel and <http://127.0.0.1:3001> cannot disagree.
+
+  What the panel deliberately does not copy is the parts only the dashboard can
+  own — provider keys, routing strategy, usage charts. Both the Ranking tab and
+  the status card carry an **Open the full console** button for those.
 - Lets you choose where it shows up. The Settings tab has an **Entry** picker —
   both places, sidebar only, or plugin page only. Choosing "plugin page only"
   hides the sidebar icon and embeds the model list on that page instead, so the
   plugin is never left without a way in.
 - The model list sorts by name, context size, or measured availability, and
   every mode keeps the rows the picker actually offers at the top. Bulk ticking
-  leads with "Tick usable" (probe-answered only), and all three buttons
+  leads with "Tick usable" (offered or probe-answered), and all three buttons
   act on the rows the search box left visible — so "type qwen, tick usable"
   selects the working qwen models, not all 287.
 - **Mints and reuses its own key.** On first boot the router generates a unified
@@ -91,8 +107,9 @@ lib/stream.js      SSE -> harness stream vocabulary, one attempt
 lib/supervisor.js  router process: reachability, start, stop, key handoff
 lib/store.js       settings file + credential resolution
 lib/probe.js       real availability: one request per claimed model, cached verdicts
+lib/ranking.js     the dashboard's ranking table, read out of the router's database
 lib/kernel.js      the only @deepseek-ai/* seam (attribution user agent)
-lib/client.js      browser half: sidebar panel, model list, settings, config page
+lib/client.js      browser half: sidebar panel, ranking, model list, settings
 vendor/            the bundled router: server-dist, client-dist, node_modules
 smoke.mjs          offline checks; add --live to hit a running router
 ```
