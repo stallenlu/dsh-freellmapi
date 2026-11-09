@@ -612,6 +612,71 @@ check('ranking reads are serialised and failures are not silent', () => {
   assert.equal(src.includes('sizeLabel'), false, 'sizeLabel was unused and computed incorrectly')
 })
 
+check('a failed spawn is an error the panel can show, not a crashed host', async () => {
+  const src = readFileSync('./lib/supervisor.js', 'utf8')
+  // A failed spawn emits 'error' on the child, not 'exit'. An unhandled 'error'
+  // event is an uncaughtException in the HOST process, so one missing runtime
+  // entry would take the whole app down.
+  assert.match(src, /child\.on\('error'/, 'the spawned child needs an error listener')
+  assert.match(src, /spawnError/, 'the loop must be able to see the spawn failure')
+  assert.match(src, /if \(spawnError !== null\)/, 'a failed spawn must fail fast, not wait out the grace period')
+  // taskkill can itself fail to spawn (missing from PATH); same class of bug.
+  assert.match(src, /killer\.on\('error'/, 'the taskkill child needs an error listener too')
+
+  // Behaviour, not just text: a package that lost its bundled runtime must
+  // fail fast with a readable message instead of waiting out the 25s grace
+  // period. The spawn 'error' branch above cannot be forced in-process (it
+  // needs an unexecutable host binary), so it stays a structural assertion.
+  const { DEFAULTS } = await import('./lib/store.js')
+  const { Supervisor } = await import('./lib/supervisor.js')
+  const { mkdtempSync } = await import('node:fs')
+  const empty = mkdtempSync(path.join(os.tmpdir(), 'dflm-nospawn-'))
+  const broken = new Supervisor({
+    stateDir: empty,
+    settings: () => ({ ...DEFAULTS, autoStart: false }),
+    logger: { debug() {}, warn() {}, info() {} },
+  })
+  broken.reachable = async () => false
+  broken.paths = () => ({
+    entry: path.join(empty, 'vendor', 'server-dist', 'index.js'),
+    clientDist: path.join(empty, 'vendor', 'client-dist'),
+    dataDir: empty,
+    dbPath: path.join(empty, 'data', 'freeapi.db'),
+    envPath: path.join(empty, '.env'),
+  })
+  const started = Date.now()
+  await assert.rejects(
+    () => broken.startUnshared(),
+    (error) => {
+      assert.match(String(error.message), /reinstall the plugin/, 'the message must say what is missing')
+      return true
+    },
+    'starting with no runtime entry must reject',
+  )
+  assert.ok(Date.now() - started < 10_000, 'it must not wait out the 25s grace period')
+})
+
+check('the router is torn down even when autoStart is off', () => {
+  const src = readFileSync('./lib/index.js', 'utf8')
+  // The panel, the tools and ensureRouter can all start the server with
+  // autoStart off. If the cleanup sits inside the autoStart branch, that
+  // manually started router outlives the app and keeps :3001 bound.
+  const startAt = src.indexOf('if (settings.get().autoStart) {')
+  const stopAt = src.indexOf("'dsh-freellmapi: stop the router'")
+  assert.ok(startAt !== -1, 'the autostart branch must exist')
+  assert.ok(stopAt !== -1, 'the stop effect must exist')
+  assert.ok(startAt < stopAt, 'the stop effect must sit after, not inside, the autostart branch')
+  // Indentation is the contract here: `apply` runs at two spaces, so anything
+  // at that depth is a sibling of the autostart branch rather than a child.
+  const effectLine = src.slice(0, stopAt).split('\n').reverse().find((line) => line.includes('ctx.effect('))
+  assert.ok(effectLine !== undefined, 'the stop effect must be a ctx.effect call')
+  assert.equal(
+    effectLine.length - effectLine.trimStart().length,
+    2,
+    'the stop effect must be indented as a sibling of the autostart branch, not nested in it',
+  )
+})
+
 await Promise.all(pending)
 
 // --- live router (opt-in) ---------------------------------------------------
