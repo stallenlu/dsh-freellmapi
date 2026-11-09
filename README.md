@@ -1,8 +1,14 @@
+English | [中文](README.zh.md)
+
 # dsh-freellmapi
 
 FreeLLMAPI as a first-class model provider in DeepSeek Harness — and the router
 itself ships inside the plugin, so there is nothing else to install, clone, or
 build.
+
+![The Ranking tab: one row per model with a stability, speed and intelligence bar, the combined score, the serving platforms, rate limits and context window](assets/screenshot-ranking.png)
+
+![The Status tab: router state, endpoint and process, and the button into the full console](assets/screenshot-status.png)
 
 ## What it does
 
@@ -58,9 +64,19 @@ build.
 
 ## Setup
 
-Install the tarball from the [releases page](https://github.com/stallenlu/dsh-freellmapi/releases)
-rather than the git tree: `vendor/node_modules` is the 95-package runtime closure,
-and only the packed tarball carries it.
+Install the packed tarball from the [releases
+page](https://github.com/stallenlu/dsh-freellmapi/releases), or from the
+[dshmarket listing](https://awesome-dsh-plugin.com/p/stallenlu/dsh-freellmapi/):
+
+```
+dsh plugin --profile web add "https://github.com/stallenlu/dsh-freellmapi/releases/download/v1.2.4/dsh-freellmapi-1.2.4.tgz"
+```
+
+**Not** `dsh plugin --profile web add github:stallenlu/dsh-freellmapi`. The git
+tree does not carry `vendor/node_modules` — a 95-package runtime closure the
+router needs — so a git install produces a plugin that cannot start its server.
+The market page adds that GitHub line to every entry it lists; for this plugin
+it is the wrong one.
 
 1. Enable the plugin (it is a bundle: one line in the profile's `package.json`
    and one patch entry, both already written by `cordis.patch.yml`).
@@ -137,6 +153,20 @@ plugin honest: the adapter talks HTTP to a process it owns.
 falls back to `node:sqlite` when `better-sqlite3` cannot be loaded, because the
 host runs Node 24 (ABI 149) while the shipped native addon targets ABI 127.
 
+## Thanks
+
+The hard part is not mine. The router, the provider catalogue, the routing and
+failover logic, the encrypted key store and the stability / speed / intelligence
+scoring all come from **[tashfeenahmed/freellmapi](https://github.com/tashfeenahmed/freellmapi)**
+by [Tashfeen Ahmed](https://github.com/tashfeenahmed) — tens of free LLM
+providers and hundreds of free model endpoints behind a single `/v1`, plus any
+custom OpenAI-compatible endpoint you point it at.
+
+This plugin carries that work into DeepSeek Harness and gives it a panel — the
+`vendor/` tree is a snapshot of upstream's compiled output, unmodified except
+for the `node:sqlite` fallback noted above. If FreeLLMAPI is useful to you, the
+star belongs [upstream](https://github.com/tashfeenahmed/freellmapi).
+
 ## Tests
 
 ```
@@ -147,5 +177,7 @@ node smoke.mjs --live    # also: real catalogue + one real completion
 The live check needs a router on `baseURL` with a usable provider key; it skips
 with a reason when either is missing.
 
-MIT — the bundled router is MIT, Copyright (c) 2026 Tashfeen Ahmed; see
+## License
+
+MIT. The bundled router is MIT, Copyright (c) 2026 Tashfeen Ahmed; see
 `vendor/LICENSE`.
