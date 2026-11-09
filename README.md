@@ -6,9 +6,24 @@ FreeLLMAPI as a first-class model provider in DeepSeek Harness — and the route
 itself ships inside the plugin, so there is nothing else to install, clone, or
 build.
 
-![The Ranking tab: one row per model with a stability, speed and intelligence bar, the combined score, the serving platforms, rate limits and context window](assets/screenshot-ranking.png)
+**A real answer, from a free model the router picked.**
 
-![The Status tab: router state, endpoint and process, and the button into the full console](assets/screenshot-status.png)
+![A conversation in DSH answered by a freellmapi slot model; the composer shows "Opus slot (auto-routed to a free model)"](assets/screenshot-chat.png)
+
+**It is a normal provider.** `freellmapi` sits in the model picker next to
+everything else, and every model the router reaches is one entry:
+
+![The DSH model picker, filtered to FreeLLMAPI, listing auto, fusion, the Claude slots and individual models](assets/screenshot-picker.png)
+
+**The Ranking tab.** One row per model with a stability / speed / intelligence
+bar, the combined score, the serving platforms, rate limits and context window:
+
+![The plugin's Ranking tab: 287 scored models, sortable columns, per-row enable switches](assets/screenshot-ranking.png)
+
+**And the router's own console**, one click away, for provider keys, routing
+strategy and usage — the parts a panel should not reimplement:
+
+![The bundled FreeLLMAPI console's model page: routing strategy, fallback chain, filters and the per-model score table](assets/screenshot-console.png)
 
 ## What it does
 
@@ -136,7 +151,7 @@ lib/ranking.js     the dashboard's ranking table, read out of the router's datab
 lib/kernel.js      the only @deepseek-ai/* seam (attribution user agent)
 lib/client.js      browser half: sidebar panel, ranking, model list, settings
 vendor/            the bundled router: server-dist, client-dist, node_modules
-assets/            storefront tile and screenshots
+assets/            storefront tile and the four listing screenshots
 screenshots.json   storefront images, read by the dshmarket listing
 smoke.mjs          offline checks; add --live to hit a running router
 ```

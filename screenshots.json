@@ -1,6 +1,8 @@
 {
   "screenshots": [
+    "assets/screenshot-chat.png",
+    "assets/screenshot-picker.png",
     "assets/screenshot-ranking.png",
-    "assets/screenshot-status.png"
+    "assets/screenshot-console.png"
   ]
 }

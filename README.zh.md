@@ -5,9 +5,24 @@
 把 FreeLLMAPI 做成 DeepSeek Harness 里的一等模型 provider —— 而且路由本体就随插件
 打包，不用另外装、克隆或编译任何东西。
 
-![排行页：每个模型一行，稳定 / 速度 / 智能三条彩条、综合评分、服务它的平台、限速与上下文窗口](assets/screenshot-ranking.png)
+**真实的回答，来自路由器挑中的一个免费模型。**
 
-![服务状态页：路由器状态、接口地址与进程，以及进入完整控制台的按钮](assets/screenshot-status.png)
+![DSH 里的一段对话，由 freellmapi 的槽位模型作答；输入框显示「Opus slot (auto-routed to a free model)」](assets/screenshot-chat.png)
+
+**它就是一个普通 provider。** `freellmapi` 排在模型选择器里跟别的模型并排，路由器能碰到的每个
+模型都是一个条目：
+
+![DSH 模型选择器，筛选到 FreeLLMAPI，列出 auto、fusion、Claude 槽位与具体模型](assets/screenshot-picker.png)
+
+**排行页。** 一个模型一行，稳定 / 速度 / 智能三条彩条、综合评分、服务它的平台、限速与上下文
+窗口：
+
+![插件的排行页：287 个已评分模型、可按列排序、每行有启用开关](assets/screenshot-ranking.png)
+
+**以及路由器自己的控制台**，一键可达，用来管 provider key、路由策略与用量 —— 这些是面板不该
+重复实现的部分：
+
+![内置 FreeLLMAPI 控制台的模型页：路由策略、回退链、筛选与逐模型评分表](assets/screenshot-console.png)
 
 ## 它能做什么
 
