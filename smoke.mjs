@@ -11,7 +11,7 @@
  */
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import fs, { readFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 
@@ -743,12 +743,61 @@ check('1.2.7 regressions: the crash / lie / leak / hang fixes stay put', () => {
     assert.equal(guarded({ origin, host }), false, label)
   }
   // Publish gate — a tarball can no longer ship a stale install command.
-  assert.equal(pkg.version, '1.2.10')
+  assert.equal(pkg.version, '1.2.11')
   assert.equal(pkg.scripts && pkg.scripts.prepack, 'node smoke.mjs')
   assert.equal(pkg.engines.node, '>=22.13.0')
-  assert.match(readme, /releases\/download\/v1\.2\.10\/dsh-freellmapi-1\.2\.10\.tgz/)
-  assert.match(readmeZh, /releases\/download\/v1\.2\.10\/dsh-freellmapi-1\.2\.10\.tgz/)
-  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.[5-9]\/dsh-freellmapi-1\.2\.[5-9]\.tgz/)
+  assert.match(readme, /releases\/download\/v1\.2\.11\/dsh-freellmapi-1\.2\.11\.tgz/)
+  assert.match(readmeZh, /releases\/download\/v1\.2\.11\/dsh-freellmapi-1\.2\.11\.tgz/)
+  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.(?:[5-9]|10)\/dsh-freellmapi-1\.2\.(?:[5-9]|10)\.tgz/)
+})
+
+check('a fresh install comes up with the anonymous providers already enabled', async () => {
+  const keyless = await import('./lib/keyless.js')
+  const platforms = await keyless.keylessPlatforms()
+  assert.ok(platforms.length >= 7, `the registry lists the anonymous providers, got ${platforms.length}`)
+  for (const platform of ['aihorde', 'aisense', 'halx', 'keenable', 'kilo', 'ovh', 'parallel']) {
+    assert.ok(platforms.includes(platform), `${platform} is a keyless provider and must be in the plan`)
+  }
+  // A database that does not exist yet has none of the rows: everything is missing.
+  const stateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'dflm-seed-'))
+  const paths = runtime.runtimePaths(stateDir)
+  const fresh = await keyless.planKeylessSeed(paths.dbPath)
+  assert.deepEqual(fresh.missing, platforms, 'a brand-new database is missing every keyless platform')
+  // Those missing platforms reach the child as the server's own declarative config.
+  const seeded = runtime.childEnv(paths, { baseURL: 'http://127.0.0.1:3001/v1' }, fresh)
+  assert.equal(typeof seeded.FREEAPI_CONFIG_JSON, 'string', 'the seed must be handed to the child process')
+  const payload = JSON.parse(seeded.FREEAPI_CONFIG_JSON)
+  assert.equal(payload.keys.length, platforms.length)
+  assert.deepEqual(payload.keys.map((k) => k.platform).sort(), platforms, 'every keyless platform is declared')
+  assert.equal('key' in payload.keys[0], false, 'a keyless platform declares no key at all')
+  // Nothing to seed means the variable is absent, so nothing changes on a later boot.
+  const empty = runtime.childEnv(paths, { baseURL: 'http://127.0.0.1:3001/v1' }, { missing: [] })
+  assert.equal('FREEAPI_CONFIG_JSON' in empty, false, 'an already-seeded database must not re-declare anything')
+  // An operator who set the variable by hand keeps their configuration.
+  const saved = process.env.FREEAPI_CONFIG_JSON
+  process.env.FREEAPI_CONFIG_JSON = '{"keys":[{"platform":"ovh","key":"manual"}]}'
+  try {
+    const handed = runtime.childEnv(paths, { baseURL: 'http://127.0.0.1:3001/v1' }, fresh)
+    assert.equal(handed.FREEAPI_CONFIG_JSON, '{"keys":[{"platform":"ovh","key":"manual"}]}', 'a hand-written config wins')
+  } finally {
+    if (saved === undefined) delete process.env.FREEAPI_CONFIG_JSON
+    else process.env.FREEAPI_CONFIG_JSON = saved
+  }
+  // And the supervisor is what asks for the plan, before it spawns.
+  const supervisor = readFileSync('./lib/supervisor.js', 'utf8')
+  assert.match(supervisor, /import \{ planKeylessSeed \} from '\.\/keyless\.js'/, 'the supervisor must own the seeding decision')
+  assert.match(supervisor, /const seed = await planKeylessSeed\(paths\.dbPath\)/, 'the plan is built from the real database path')
+  assert.match(supervisor, /env: childEnv\(paths, this\.settings\(\), seed\)/, 'the plan must reach the child environment')
+  // The panel says it, or the feature is invisible to the person it is for.
+  const index = readFileSync('./lib/index.js', 'utf8')
+  const client = readFileSync('./lib/client.js', 'utf8')
+  assert.match(index, /keyless: seeding === undefined/, 'status must report the keyless state')
+  assert.match(index, /already: seeding\.platforms\.filter\(/, 'the panel needs what is already on')
+  assert.match(index, /pending: seeding\.missing/, 'and what the next start would add')
+  assert.match(index, /lean === true\s*\?\s*undefined\s*:\s*await planKeylessSeed/, 'a lean poll must not re-read the database')
+  assert.match(client, /t\('keylessOn', \{ n: keyless\.already\.length \}\)/, 'the panel must show the enabled count')
+  assert.match(client, /keylessPending/, 'and the providers a restart would add')
+  fs.rmSync(stateDir, { recursive: true, force: true })
 })
 
 await Promise.all(pending)
