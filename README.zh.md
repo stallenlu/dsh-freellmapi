@@ -69,7 +69,7 @@ tarball，或从 [dshmarket 条目](https://awesome-dsh-plugin.com/p/stallenlu/d
 进：
 
 ```
-dsh plugin --profile web add "https://github.com/stallenlu/dsh-freellmapi/releases/download/v1.2.4/dsh-freellmapi-1.2.4.tgz"
+dsh plugin --profile web add "https://github.com/stallenlu/dsh-freellmapi/releases/download/v1.2.5/dsh-freellmapi-1.2.5.tgz"
 ```
 
 **不要**用 `dsh plugin --profile web add github:stallenlu/dsh-freellmapi`。git 源码树
