@@ -393,12 +393,15 @@ check('the panel offers an entry-visibility choice that gates the slots', () => 
   assert.match(src, /bindWhile\(\s*\(\) => placement\.get\(\) !== 'sidebar'/, 'plugin page entry not gated')
   assert.match(src, /bindWhile\(\s*\(\) => placement\.get\(\) !== 'settings'/, 'sidebar entry not gated')
   // The panel route is NOT gated: a view another part of the app can hold open
-  // must not disappear because its icon was hidden. Only the icon is. Injections
-  // inside a bindWhile array sit at least 16 spaces deep; a bare one sits 8 —
-  // 10 now that the whole body lives inside the try/catch that keeps a broken
-  // panel from taking the web boot down with it.
-  const main = src.match(/^ {8,12}ctx\.slots\.inject\('main'/m)
-  assert.ok(main, 'the main panel injection must stay outside bindWhile')
+  // must not disappear because its icon was hidden. Only the icon is. A bare
+  // inject re-registers on every HMR activation, so it still needs a ctx.effect
+  // owner that tears the old panel down.
+  assert.match(src, /ctx\.slots\.inject\('main'/, 'the main panel must still be injected')
+  assert.match(
+    src,
+    /ctx\.effect\(\s*\(\) => ctx\.slots\.inject\('main'[\s\S]*?'dsh-freellmapi: main panel'/,
+    'the main panel injection must be owned by a ctx.effect with a disposer',
+  )
   // and every card still mounts through h(), for the reason above
   assert.doesNotMatch(src, /[^n] (?:StatusCard|SettingsCard|ModelList|Ranking)\(\{ t, state, load \}\)/, 'inline component call')
 })
@@ -675,6 +678,43 @@ check('the router is torn down even when autoStart is off', () => {
     2,
     'the stop effect must be indented as a sibling of the autostart branch, not nested in it',
   )
+})
+
+check('1.2.7 regressions: the crash / lie / leak / hang fixes stay put', () => {
+  const client = readFileSync('./lib/client.js', 'utf8')
+  const index = readFileSync('./lib/index.js', 'utf8')
+  const stream = readFileSync('./lib/stream.js', 'utf8')
+  const supervisor = readFileSync('./lib/supervisor.js', 'utf8')
+  const pkg = JSON.parse(readFileSync('./package.json', 'utf8'))
+  const readme = readFileSync('./README.md', 'utf8')
+  const readmeZh = readFileSync('./README.zh.md', 'utf8')
+
+  // F7 — a non-numeric score must not crash React with toFixed().
+  assert.match(client, /typeof row\.rank\.score === 'number' && Number\.isFinite\(row\.rank\.score\)/, 'scored rows must guard the score')
+  assert.match(client, /Number\.isFinite\(row\.rank\.score\) \? row\.rank\.score\.toFixed\(3\) : '—'/, 'the score cell needs a fallback')
+  // F8 — a failed save must not clear the draft and claim success.
+  assert.match(client, /result\.ok !== true/, 'save must gate on the load result')
+  assert.doesNotMatch(client, /await load\('save', \{ patch: draft \}\);\s*setDirty\(false\)/, 'save must not blindly report success')
+  // F1 / F9 — one disposer for the main panel and one shared router.
+  assert.match(client, /ctx\.effect\(\s*\(\) => ctx\.slots\.inject\('main'/, 'the main panel needs a ctx.effect owner')
+  assert.match(client, /const queue = \{ current: Promise\.resolve\(\) \}/, 'one shared request queue')
+  assert.match(client, /subscribe\('dflm\.state'/, 'state changes must reach every view')
+  // T1 — [DONE] ends the stream instead of waiting for the read timeout.
+  assert.match(stream, /payload === '\[DONE\]'\) return true/, '[DONE] must terminate the SSE loop')
+  assert.match(stream, /decoder\.decode\(\)/, 'the trailing bytes must be flushed')
+  // S1 — a failed startup tears its child down.
+  assert.match(supervisor, /catch \(error\) \{\s*this\.stop\(\)/, 'a failed start must kill the child')
+  // I1 / floating promise — no-Origin calls are refused, handler catches.
+  assert.match(index, /typeof origin !== 'string'/, 'a request without an Origin must be refused')
+  assert.match(index, /void apiRoute\(req, res/, 'the panel handler must consume its own rejection')
+  assert.match(index, /shouldStop: \(\) => disposed/, 'probe batches must stop after teardown')
+  // Publish gate — a tarball can no longer ship a stale install command.
+  assert.equal(pkg.version, '1.2.7')
+  assert.equal(pkg.scripts && pkg.scripts.prepack, 'node smoke.mjs')
+  assert.equal(pkg.engines.node, '>=22.13.0')
+  assert.match(readme, /releases\/download\/v1\.2\.7\/dsh-freellmapi-1\.2\.7\.tgz/)
+  assert.match(readmeZh, /releases\/download\/v1\.2\.7\/dsh-freellmapi-1\.2\.7\.tgz/)
+  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.5\/dsh-freellmapi-1\.2\.5\.tgz/)
 })
 
 await Promise.all(pending)

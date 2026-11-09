@@ -84,7 +84,7 @@ page](https://github.com/stallenlu/dsh-freellmapi/releases), or from the
 [dshmarket listing](https://awesome-dsh-plugin.com/p/stallenlu/dsh-freellmapi/):
 
 ```
-dsh plugin --profile web add "https://github.com/stallenlu/dsh-freellmapi/releases/download/v1.2.5/dsh-freellmapi-1.2.5.tgz"
+dsh plugin --profile web add "https://github.com/stallenlu/dsh-freellmapi/releases/download/v1.2.7/dsh-freellmapi-1.2.7.tgz"
 ```
 
 **Not** `dsh plugin --profile web add github:stallenlu/dsh-freellmapi`. The git
