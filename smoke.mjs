@@ -743,12 +743,12 @@ check('1.2.7 regressions: the crash / lie / leak / hang fixes stay put', () => {
     assert.equal(guarded({ origin, host }), false, label)
   }
   // Publish gate — a tarball can no longer ship a stale install command.
-  assert.equal(pkg.version, '1.2.9')
+  assert.equal(pkg.version, '1.2.10')
   assert.equal(pkg.scripts && pkg.scripts.prepack, 'node smoke.mjs')
   assert.equal(pkg.engines.node, '>=22.13.0')
-  assert.match(readme, /releases\/download\/v1\.2\.9\/dsh-freellmapi-1\.2\.9\.tgz/)
-  assert.match(readmeZh, /releases\/download\/v1\.2\.9\/dsh-freellmapi-1\.2\.9\.tgz/)
-  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.[5678]\/dsh-freellmapi-1\.2\.[5678]\.tgz/)
+  assert.match(readme, /releases\/download\/v1\.2\.10\/dsh-freellmapi-1\.2\.10\.tgz/)
+  assert.match(readmeZh, /releases\/download\/v1\.2\.10\/dsh-freellmapi-1\.2\.10\.tgz/)
+  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.[5-9]\/dsh-freellmapi-1\.2\.[5-9]\.tgz/)
 })
 
 await Promise.all(pending)

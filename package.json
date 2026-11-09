@@ -1,6 +1,6 @@
 {
   "name": "dsh-freellmapi",
-  "version": "1.2.9",
+  "version": "1.2.10",
   "type": "module",
   "description": "FreeLLMAPI as a first-class model provider in DeepSeek Harness: the free-model router ships inside the plugin (no Docker, no checkout), with a sidebar panel to start it, probe which models really answer, and rank them by the router's own scores. 把 FreeLLMAPI 做成 DeepSeek Harness 的一等模型 provider，路由本体随插件打包。",
   "keywords": [
