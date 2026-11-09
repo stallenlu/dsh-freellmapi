@@ -212,6 +212,7 @@ check('settings refuse an address that cannot work', () => {
 
 const runtime = await import('./lib/runtime.js')
 const supervisor = await import('./lib/supervisor.js')
+const panel = await import('./lib/index.js')
 
 check('the bundled router is present in this package', () => {
   const stateDir = path.join(os.tmpdir(), `dflm-smoke-${process.pid}`)
@@ -704,17 +705,50 @@ check('1.2.7 regressions: the crash / lie / leak / hang fixes stay put', () => {
   assert.match(stream, /decoder\.decode\(\)/, 'the trailing bytes must be flushed')
   // S1 — a failed startup tears its child down.
   assert.match(supervisor, /catch \(error\) \{\s*this\.stop\(\)/, 'a failed start must kill the child')
-  // I1 / floating promise — no-Origin calls are refused, handler catches.
-  assert.match(index, /typeof origin !== 'string'/, 'a request without an Origin must be refused')
+  // I1 / floating promise — the Origin guard, and the handler catches itself.
+  //
+  // The desktop app proxies this panel through its own `dsh-app://` protocol and
+  // its forwarder strips `origin` and `host` before the request lands here, so a
+  // POST from our own panel arrives with no Origin. Requiring the header locked
+  // the panel out of its own API on the desktop (1.2.7 shipped that and showed
+  // "origin rejected"). Assert the behaviour, not the source text: absent Origin
+  // is fine on a loopback host, and still refused for anything else.
   assert.match(index, /void apiRoute\(req, res/, 'the panel handler must consume its own rejection')
   assert.match(index, /shouldStop: \(\) => disposed/, 'probe batches must stop after teardown')
+  assert.equal(typeof panel.sameOrigin, 'function', 'the Origin guard must be importable to be tested')
+  const guarded = (headers) => panel.sameOrigin({ headers })
+  const allow = [
+    [undefined, '127.0.0.1:51580', 'the desktop forwarder strips Origin'],
+    [undefined, 'localhost:51580', 'a no-Origin request on localhost'],
+    [undefined, '[::1]:51580', 'a no-Origin request on IPv6 loopback'],
+    ['null', '127.0.0.1:51580', 'an opaque Origin on loopback'],
+    ['http://127.0.0.1:51580', '127.0.0.1:51580', 'a browser same-origin POST'],
+    ['http://localhost:51580', 'localhost:51580', 'a browser same-origin POST on localhost'],
+    ['dsh-app://app', '127.0.0.1:51580', 'the desktop window posts under its own protocol'],
+    ['dsh-app://shell', '127.0.0.1:51580', 'the desktop chrome posts under the same scheme'],
+  ]
+  for (const [origin, host, label] of allow) {
+    assert.equal(guarded({ origin, host }), true, label)
+  }
+  const deny = [
+    [undefined, 'evil.example.com', 'a no-Origin request from a remote host'],
+    ['null', 'evil.example.com', 'an opaque Origin from a remote host'],
+    ['https://evil.example.com', '127.0.0.1:51580', 'a foreign Origin'],
+    ['dsh-appx://app', '127.0.0.1:51580', 'a lookalike of the desktop scheme'],
+    ['dsh-app://app', 'evil.example.com', 'the desktop origin off loopback'],
+    ['http://127.0.0.1:51580', '127.0.0.1:51581', 'an Origin for a different port'],
+    [undefined, '', 'a request with no host at all'],
+  ]
+  for (const [origin, host, label] of deny) {
+    assert.equal(guarded({ origin, host }), false, label)
+  }
   // Publish gate — a tarball can no longer ship a stale install command.
-  assert.equal(pkg.version, '1.2.7')
+  assert.equal(pkg.version, '1.2.9')
   assert.equal(pkg.scripts && pkg.scripts.prepack, 'node smoke.mjs')
   assert.equal(pkg.engines.node, '>=22.13.0')
-  assert.match(readme, /releases\/download\/v1\.2\.7\/dsh-freellmapi-1\.2\.7\.tgz/)
-  assert.match(readmeZh, /releases\/download\/v1\.2\.7\/dsh-freellmapi-1\.2\.7\.tgz/)
-  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.5\/dsh-freellmapi-1\.2\.5\.tgz/)
+  assert.match(readme, /releases\/download\/v1\.2\.9\/dsh-freellmapi-1\.2\.9\.tgz/)
+  assert.match(readmeZh, /releases\/download\/v1\.2\.9\/dsh-freellmapi-1\.2\.9\.tgz/)
+  assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.[5678]\/dsh-freellmapi-1\.2\.[5678]\.tgz/)
 })
 
 await Promise.all(pending)
