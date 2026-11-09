@@ -523,7 +523,12 @@ check('the ranking tab is usable, not just readable', () => {
   const src = readFileSync('./lib/client.js', 'utf8')
   // Every control the :3001 table has and this one can honestly support.
   assert.match(src, /className: 'dflm-switch'/, 'each row needs its own enable switch')
-  assert.match(src, /'aria-pressed': picked\.has\(row\.id\)/, 'the switch must report its state')
+  // A switch carries its state in aria-checked; aria-pressed belongs to toggle
+  // buttons and left screen readers announcing a pressed button instead of an
+  // on/off switch. The knob is painted from the same attribute, so the CSS has
+  // to agree or the switch always renders closed.
+  assert.match(src, /'aria-checked': picked\.has\(row\.id\)/, 'the switch must report its state as aria-checked')
+  assert.match(src, /\.dflm-switch\[aria-checked="true"\]/, 'the switch CSS must key off aria-checked')
   assert.ok(src.includes('const RANK_SORTS'), 'the table must be sortable')
   for (const key of ['rankAllOn', 'rankAllOff', 'rankShowing', 'rankModel']) {
     assert.ok(src.includes(key + ':'), 'missing ' + key + ' label')
@@ -561,6 +566,50 @@ check('native selects follow the panel theme, not the OS default', () => {
     true,
     'Panel and BundleConfig must both apply the measured scheme',
   )
+})
+
+check('a hung host cannot freeze the panel forever', () => {
+  // Two fetches sit on the path between a stuck router and a dead panel: the
+  // catalogue read in the host half and the request the panel makes. With no
+  // ceiling the first never settles, so the status call never answers, the
+  // client's queue never drains, and every later click waits behind it until a
+  // page reload. Milliseconds are not the point — the presence of a signal is.
+  const adapter = readFileSync('./lib/adapter.js', 'utf8')
+  assert.match(adapter, /signal: AbortSignal\.timeout\(CATALOG_TIMEOUT_MS\)/, 'the catalogue read needs a timeout')
+  assert.match(adapter, /const CATALOG_TIMEOUT_MS = \d+/, 'the catalogue timeout must be a named constant')
+  const client = readFileSync('./lib/client.js', 'utf8')
+  assert.match(client, /signal: AbortSignal\.timeout\(timeout\)/, 'the panel request needs a timeout')
+  // `start` waits on the supervisor's 25s grace period, so one shared ceiling
+  // would time out the only action that is legitimately slow.
+  assert.match(client, /action === 'start' \? START_TIMEOUT_MS : CALL_TIMEOUT_MS/, 'start needs its own, longer ceiling')
+  assert.match(client, /error\.name === 'TimeoutError'/, 'a timeout must surface as a message, not a raw DOMException')
+})
+
+check('the panel queues requests instead of dropping them', () => {
+  const src = readFileSync('./lib/client.js', 'utf8')
+  // The old guard was `if (busy.current) return;` — a click during a probe poll
+  // was silently discarded: the button flashed and nothing was sent.
+  assert.equal(src.includes('busy.current'), false, 'a click must never be dropped while a poll is in flight')
+  assert.match(src, /queue\.current = queue\.current\.then\(run, run\)/, 'requests must queue, and survive a rejection')
+  assert.match(src, /waitingStatus/, 'status polls must de-duplicate instead of stacking')
+  // A poll that re-delivers an identical payload must not rebuild the tree.
+  assert.match(src, /seen !== lastSeen\.current/, 'an unchanged payload must not trigger a re-render')
+  // Lean polls omit the scores; they have to be merged back or the bars blink.
+  assert.match(src, /const mergeRanks = \(data, patch\) =>/, 'lean replies must keep the scores the panel already has')
+  assert.match(src, /void load\('status', \{ lean: true \}\)/, 'the probe poll must ask for the lean payload')
+})
+
+check('ranking reads are serialised and failures are not silent', () => {
+  const src = readFileSync('./lib/ranking.js', 'utf8')
+  // The vendored db handle is a module-level singleton: two overlapping reads
+  // swap the connection out from under each other and one gets a closed handle.
+  assert.match(src, /let chain = Promise\.resolve\(\)/, 'reads must go through one chain')
+  assert.match(src, /chain = next\.catch\(\(\) => \{\}\)/, 'a rejected read must not break the chain')
+  assert.match(src, /logger\.warn\(/, 'a failed read must log its reason')
+  assert.match(src, /Date\.now\(\) - lastWarnAt > 60_000/, 'the warning must be throttled: this runs on every poll')
+  // Dead and wrong: it was never read by the client, and its condition compared
+  // against a value the loop had already overwritten.
+  assert.equal(src.includes('sizeLabel'), false, 'sizeLabel was unused and computed incorrectly')
 })
 
 await Promise.all(pending)
