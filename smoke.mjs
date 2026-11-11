@@ -523,6 +523,28 @@ check('the panel exposes the ranking tab and a way to the full console', () => {
   assert.match(src, /\.dflm-axis-track \{[^}]*flex: 1 1 auto;/, 'the track must grow inside the axis')
 })
 
+check('the panel wears the house baseline instead of a private palette', () => {
+  const src = readFileSync('./lib/client.js', 'utf8')
+  // The baseline block is inlined by dsh-design-baseline/sync.mjs. It must be
+  // present, must be called, and the three axes must read their colours from it
+  // rather than from literals — otherwise the panel drifts from every other
+  // plugin the moment the baseline changes.
+  assert.match(src, /\/\/ >>> dsh-design-baseline v/, 'missing the inlined baseline block')
+  assert.match(src, /\/\/ <<< dsh-design-baseline/, 'the baseline block is unterminated')
+  assert.match(src, /const BASELINE_CSS = "/, 'the baseline stylesheet was not inlined')
+  assert.match(src, /const THEME = \{/, 'the baseline tokens were not inlined')
+  assert.match(src, /injectBaseline\(document, PANEL_ID\)/, 'the stylesheet is inlined but never installed')
+  for (const kind of ['stability', 'speed', 'intelligence']) {
+    assert.match(
+      src,
+      new RegExp(`\\.dflm-axis-fill\\.${kind} \\{ background: var\\(--dsb-accent-${kind}, #`),
+      `the ${kind} axis must take its colour from the baseline`,
+    )
+  }
+  assert.match(src, /className: 'dflm dsb-root'/, 'the panel root must carry dsb-root so tokens resolve')
+  assert.ok(!src.includes('background: #a855f7'), 'the intelligence axis still hardcodes its colour')
+})
+
 check('the ranking tab is usable, not just readable', () => {
   const src = readFileSync('./lib/client.js', 'utf8')
   // Every control the :3001 table has and this one can honestly support.
@@ -743,11 +765,11 @@ check('1.2.7 regressions: the crash / lie / leak / hang fixes stay put', () => {
     assert.equal(guarded({ origin, host }), false, label)
   }
   // Publish gate — a tarball can no longer ship a stale install command.
-  assert.equal(pkg.version, '1.2.11')
+  assert.equal(pkg.version, '1.2.12')
   assert.equal(pkg.scripts && pkg.scripts.prepack, 'node smoke.mjs')
   assert.equal(pkg.engines.node, '>=22.13.0')
-  assert.match(readme, /releases\/download\/v1\.2\.11\/dsh-freellmapi-1\.2\.11\.tgz/)
-  assert.match(readmeZh, /releases\/download\/v1\.2\.11\/dsh-freellmapi-1\.2\.11\.tgz/)
+  assert.match(readme, /releases\/download\/v1\.2\.12\/dsh-freellmapi-1\.2\.12\.tgz/)
+  assert.match(readmeZh, /releases\/download\/v1\.2\.12\/dsh-freellmapi-1\.2\.12\.tgz/)
   assert.doesNotMatch(readme + readmeZh, /releases\/download\/v1\.2\.(?:[5-9]|10)\/dsh-freellmapi-1\.2\.(?:[5-9]|10)\.tgz/)
 })
 
